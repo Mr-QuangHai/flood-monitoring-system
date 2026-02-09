@@ -7,12 +7,10 @@ export const SYSTEM_CONFIG: SystemConfig = {
 };
 
 export const IMAGES = {
-  // A university building resembling the description
-  BANNER_BG: './dhv.jpg', 
-  
-  // Local logo file - ensure this file exists in the same folder as index.html
-  LOGO: './logo.png' 
+  BANNER_BG: '/dhv.jpg',
+  LOGO: '/logo.png'
 };
+
 
 export const MOCK_INTERVAL_MS = 2000;
 export const MAX_HISTORY_POINTS = 20;
