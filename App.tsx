@@ -5,143 +5,152 @@ import Sidebar from './components/Sidebar';
 import StatusCard from './components/StatusCard';
 import HistoryChart from './components/HistoryChart';
 import Footer from './components/Footer';
+
 import { SensorData } from './types';
 import { MOCK_INTERVAL_MS, MAX_HISTORY_POINTS } from './constants';
+
 import { database } from './firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, off } from 'firebase/database';
 
 const App: React.FC = () => {
+  /* ===================== STATE ===================== */
   const [data, setData] = useState<SensorData[]>([]);
   const [showF1, setShowF1] = useState(true);
   const [showR1, setShowR1] = useState(true);
+
   const [currentF1, setCurrentF1] = useState<number>(0);
   const [currentR1, setCurrentR1] = useState<number>(0);
-  
-  // Connection status state
+
+  // Connection status
   const [isOnline, setIsOnline] = useState<boolean>(false);
 
-  // Refs to hold the latest values for the interval to pick up
+  /* ===================== REFS ===================== */
+  // Latest values for chart interval
   const latestValues = useRef({ f1: 0, r1: 0 });
-  // Ref for auto-incrementing ID for the chart x-axis
+
+  // Auto-increment ID for chart X-axis
   const idCounter = useRef(0);
-  // Ref to track last update time for watchdog
+
+  // Last Firebase update timestamp (watchdog)
   const lastUpdateRef = useRef<number>(0);
 
-  // 1. Listen to Firebase Realtime Database
+  /* =================================================
+     1. FIREBASE REALTIME LISTENER
+     ================================================= */
   useEffect(() => {
-    // Change reference to 'waterlevel' node as per the screenshot structure
-    const dbRef = ref(database, 'waterlevel'); 
-    
-    const unsubscribe = onValue(dbRef, (snapshot) => {
+    const dbRef = ref(database, 'waterlevel');
+
+    const handleValueChange = (snapshot: any) => {
       const val = snapshot.val();
-      
-      if (val) {
-        // Data received, update timestamp and set online
-        lastUpdateRef.current = Date.now();
-        setIsOnline(true);
+      if (!val) return;
 
-        // Log data for debugging
-        console.log("Firebase Data:", val);
+      // Mark system as online
+      lastUpdateRef.current = Date.now();
+      setIsOnline(true);
 
-        // Parse data based on structure: 
-        // waterlevel: { F1: { value: 120 }, R1: { value: 133.3 } }
-        const f1Raw = val.F1?.value;
-        const r1Raw = val.R1?.value;
+      // Parse Firebase structure:
+      // waterlevel: { F1: { value }, R1: { value } }
+      const f1Val = Number(val.F1?.value ?? 0);
+      const r1Val = Number(val.R1?.value ?? 0);
 
-        const f1Val = Number(f1Raw !== undefined ? f1Raw : 0);
-        const r1Val = Number(r1Raw !== undefined ? r1Raw : 0);
+      // Update realtime cards
+      setCurrentF1(f1Val);
+      setCurrentR1(r1Val);
 
-        // Update current state for Cards (Realtime instant update)
-        setCurrentF1(f1Val);
-        setCurrentR1(r1Val);
+      // Update values for chart recorder
+      latestValues.current = { f1: f1Val, r1: r1Val };
+    };
 
-        // Update ref for the chart interval
-        latestValues.current = { f1: f1Val, r1: r1Val };
-      }
-    });
+    onValue(dbRef, handleValueChange);
 
-    return () => unsubscribe();
+    // Cleanup
+    return () => off(dbRef, 'value', handleValueChange);
   }, []);
 
-  // 2. Watchdog Timer (Check for Offline status)
+  /* =================================================
+     2. WATCHDOG – ONLINE / OFFLINE DETECTION
+     ================================================= */
   useEffect(() => {
-    const watchdogInterval = setInterval(() => {
-      // If more than 10 seconds have passed since last update, consider offline
-      const TIMEOUT_MS = 10000;
-      if (Date.now() - lastUpdateRef.current > TIMEOUT_MS && lastUpdateRef.current !== 0) {
+    const TIMEOUT_MS = 10_000;
+
+    const watchdog = setInterval(() => {
+      if (
+        lastUpdateRef.current !== 0 &&
+        Date.now() - lastUpdateRef.current > TIMEOUT_MS
+      ) {
         setIsOnline(false);
       }
     }, 1000);
 
-    return () => clearInterval(watchdogInterval);
+    return () => clearInterval(watchdog);
   }, []);
 
-  // 3. Update Chart Interval
-  // We use an interval to push data to the chart history so the X-axis keeps moving
-  // even if the water level stays exactly the same (static line).
-  // This simulates a "Strip Chart" recorder common in industrial monitoring.
+  /* =================================================
+     3. STRIP-CHART RECORDER (HISTORY)
+     ================================================= */
   useEffect(() => {
     const interval = setInterval(() => {
+      // Do not record data before first Firebase update
+      if (lastUpdateRef.current === 0) return;
+
       const now = new Date();
-      const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+
       idCounter.current += 1;
 
-      const newDataPoint: SensorData = {
+      const newPoint: SensorData = {
         id: idCounter.current,
         time: timeString,
         f1: latestValues.current.f1,
         r1: latestValues.current.r1,
       };
 
-      setData(prevData => {
-        const newData = [...prevData, newDataPoint];
-        if (newData.length > MAX_HISTORY_POINTS) {
-          newData.shift(); // Remove oldest
+      setData(prev => {
+        const updated = [...prev, newPoint];
+        if (updated.length > MAX_HISTORY_POINTS) {
+          updated.shift();
         }
-        return newData;
+        return updated;
       });
-    }, MOCK_INTERVAL_MS); // Update chart every 2 seconds
+    }, MOCK_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, []);
 
+  /* ===================== UI ===================== */
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 font-sans selection:bg-blue-500 selection:text-white flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-slate-200 font-sans flex flex-col">
       <Header isOnline={isOnline} />
-      
+
       <main className="max-w-7xl mx-auto p-4 lg:p-6 w-full flex-grow">
         <Banner />
-        
+
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Sidebar */}
+          {/* Sidebar */}
           <div className="flex-shrink-0">
-            <Sidebar 
-              showF1={showF1} 
+            <Sidebar
+              showF1={showF1}
               setShowF1={setShowF1}
               showR1={showR1}
               setShowR1={setShowR1}
             />
           </div>
 
-          {/* Main Content Area */}
+          {/* Main Content */}
           <div className="flex-grow min-w-0">
-            {/* Status Cards */}
+            {/* Realtime Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <StatusCard 
-                label="Cột F1" 
-                subLabel="F1" 
-                value={currentF1} 
-              />
-              <StatusCard 
-                label="Cột R1" 
-                subLabel="R1" 
-                value={currentR1} 
-              />
+              <StatusCard label="Cột F1" subLabel="F1" value={currentF1} />
+              <StatusCard label="Cột R1" subLabel="R1" value={currentR1} />
             </div>
 
-            {/* Chart Section */}
-            <HistoryChart 
+            {/* History Chart */}
+            <HistoryChart
               data={data}
               showF1={showF1}
               showR1={showR1}

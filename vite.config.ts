@@ -6,8 +6,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
   return {
-    // 👇 BẮT BUỘC cho GitHub Pages
-    base: '/flood-monitoring-system/',
 
     server: {
       port: 3000,
