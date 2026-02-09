@@ -16,7 +16,7 @@ const Banner: React.FC = () => {
       {/* Content */}
       <div className="absolute bottom-0 left-0 p-6 w-full">
         <h2 className="text-3xl lg:text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-lg">
-          VINH UNIVERSITY hihi
+          VINH UNIVERSITY 
         </h2>
         <div className="h-1 w-20 bg-blue-500 mb-2 rounded-full"></div>
         <p className="text-slate-300 text-lg font-medium drop-shadow-md">
