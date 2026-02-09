@@ -3,7 +3,7 @@ import { SystemConfig } from './types';
 export const SYSTEM_CONFIG: SystemConfig = {
   safeLimit: 200,
   warningLimit: 300,
-  maxLevel: 500,
+  maxLevel: 600,
 };
 
 export const IMAGES = {
