@@ -21,7 +21,7 @@ const Footer: React.FC = () => {
               </h3>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-              Hệ thống đo lường mực nước và giáp sát lũ lụt thời gian thực. 
+              Hệ thống đo lường mực nước và giám sát lũ lụt thời gian thực. 
               Ứng dụng công nghệ IoT để ứng phó với thiên tai, nhằm giảm thiểu thiệt hại về người và cơ sở hạ tầng.
             </p>
             <div className="flex gap-4 pt-2">
